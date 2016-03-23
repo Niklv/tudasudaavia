@@ -203,7 +203,7 @@ function processArrivalFlights(obj, cb) {
         obj = JSON.parse(obj);
     var hourTerminalBuckets = [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}];
     if (!obj || !_.has(obj, "flightStatuses"))
-        return hourTerminalBuckets;
+        return cb(null, [hourTerminalBuckets, obj]);
     async.each(obj.flightStatuses, function (item, cb) {
         if (!_.has(item, "arrivalDate") || !_.has(item.arrivalDate, "dateLocal"))
             return cb();
@@ -229,7 +229,7 @@ function processDepartureFlights(obj, cb) {
         obj = JSON.parse(obj);
     var hourTerminalBuckets = [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}];
     if (!obj || !_.has(obj, "flightStatuses"))
-        return hourTerminalBuckets;
+        return cb(null, [hourTerminalBuckets, obj]);
     async.each(obj.flightStatuses, function (item, cb) {
         if (!_.has(item, "departureDate") || !_.has(item.departureDate, "dateLocal"))
             return cb();
