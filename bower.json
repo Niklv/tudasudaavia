@@ -1,0 +1,18 @@
+{
+  "name": "tudasudaavia",
+  "private": true,
+  "dependencies": {
+    "angular": "^1.5.2",
+    "jquery": "^2.2.2",
+    "angular-resource": "^1.5.2",
+    "angular-sanitize": "^1.5.2",
+    "angular-cookies": "^1.5.2",
+    "angular-route": "^1.5.2",
+    "angular-http-auth": "^1.2.3",
+    "angular-bootstrap": "^1.2.5",
+    "bootstrap": "^3.3.6",
+    "angucomplete-alt": "^2.2.0",
+    "angular-chart.js": "^0.9.0",
+    "underscore": "^1.8.3"
+  }
+}

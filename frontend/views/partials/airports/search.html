@@ -1,0 +1,54 @@
+<div class="containter">
+    <div class="row">
+        <form class="form-inline" ng-submit="findOne()">
+            <div class="form-group">
+                <angucomplete-alt id="airports"
+                                  placeholder="Search airport"
+                                  pause="400"
+                                  selected-object="selectedAirport"
+                                  remote-url="/api/airports/find?s="
+                                  title-field="code"
+                                  description-field="desc"
+                                  match-class="highlight"
+                                  ng-required="true"
+                                  input-class="form-control"/>
+            </div>
+            <div class="form-group">
+                <p class="input-group">
+                    <input type="text"
+                           placeholder="Click calendar ->"
+                           class="form-control"
+                           close-on-date-selection="true"
+                           uib-datepicker-popup="dd.MM.yyyy"
+                           is-open="datepicker.opened"
+                           ng-model="selectedDate"
+                           ng-required="true"
+                           datepicker-options="datepickeropts"
+                           close-text="Close"/>
+                <span class="input-group-btn">
+                    <button type="button" class="btn btn-default" ng-click="opendatepicker()">
+                        <i class="glyphicon glyphicon-calendar"></i>
+                    </button>
+                </span>
+                </p>
+            </div>
+            <button type="submit" class="btn btn-default form-control">Load</button>
+        </form>
+    </div>
+    <div class="row" ng-show="result">
+        <div class="col-sm-6">
+            <h3>Departure</h3>
+            <canvas id="line1" class="chart chart-line" chart-data="dataDep"
+                    chart-labels="labels" chart-legend="true" chart-series="seriesDep">
+            </canvas>
+            <h3>Arrival</h3>
+            <canvas id="line2" class="chart chart-line" chart-data="dataArr"
+                    chart-labels="labels" chart-legend="true" chart-series="seriesArr">
+            </canvas>
+        </div>
+        <div class="col-sm-6">
+            <h3>JSON</h3>
+            <pre>{{result | json}}</pre>
+        </div>
+    </div>
+</div>
