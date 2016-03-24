@@ -1,6 +1,8 @@
 // http://www.airlineupdate.com/content_public/codes/aircraft/aircraft_iata.htm
 // http://aerolan.dn.ua/iata-kody-samoletov
 var planes = {
+    'SU1': 98,
+    'SU7': 83,
     '32A': 150,
     '74N': 5,
     'SU9': 87,

@@ -5,8 +5,13 @@ angular.module('ATApp')
         $scope.datepicker = {
             opened: false
         };
+        var plusOneYear = new Date();
+        plusOneYear.setFullYear(plusOneYear.getFullYear() + 1);
+        var minusThreeDays = new Date();
+        minusThreeDays.setDate(minusThreeDays.getDate()-3);
         $scope.datepickeropts = {
-            maxDate: new Date()
+            maxDate: plusOneYear,
+            minDate: minusThreeDays
         };
         $scope.opendatepicker = function () {
             $scope.datepicker.opened = true;

@@ -38,6 +38,7 @@ exports.show = function (req, res) {
     res.json(req.airport);
 };
 
+
 /**
  * List of airports
  */
@@ -85,185 +86,83 @@ exports.checkCache = function (req, res, next) {
 };
 
 exports.load = function (req, res, next) {
-    async.parallel([
-        function (cb) {
-            queryAndProcessArrivals(req.airportCode, req.queryDate, cb);
-        },
-        function (cb) {
-            queryAndProcessDepartures(req.airportCode, req.queryDate, cb);
-        }
-    ], function (err, calculated) {
-        var load = new AirportLoad({
-            date: req.queryDate.toDateString(),
-            airportCode: req.airportCode,
-            calculatedArrLoad: calculated[0][0],
-            calculatedDepLoad: calculated[1][0],
-            rawArrResponses: calculated[0][1],
-            rawDepResponses: calculated[1][1]
-        });
+    getSchedule(req.airportCode, req.queryDate, function (err, data) {
         load.save(function (err) {
             if (err)
                 res.json(500, err);
             else
-                res.json({airport: req.airport, arr: load.calculatedArrLoad, dep: load.calculatedDepLoad});
+                res.json({airport: req.airport, arr: data.calculatedArrLoad, dep: data.calculatedDepLoad});
         });
     });
 };
 
-function queryAndProcessArrivals(code, date, cb) {
-    async.parallel([
-        function (cb) {
-            queryFlightStats('arr', code, date, 0, function (err, data) {
-                if (err)
-                    console.log(err);
-                processArrivalFlights(data, cb);
-            });
+function getSchedule(code, date, cb) {
+    // need mock it!
+    async.auto({
+        dep: function (cb) {
+            async.times(24, async.apply(queryAndParseSchedule, code, date, 'dep'), cb);
         },
-        function (cb) {
-            queryFlightStats('arr', code, date, 6, function (err, data) {
-                if (err)
-                    console.log(err);
-                processArrivalFlights(data, cb);
-            });
+        arr: function (cb) {
+            async.times(24, async.apply(queryAndParseSchedule, code, date, 'arr'), cb);
         },
-        function (cb) {
-            queryFlightStats('arr', code, date, 12, function (err, data) {
-                if (err)
-                    console.log(err);
-                processArrivalFlights(data, cb);
+        save: ['dep', 'arr', function (res, cb) {
+            var load = new AirportLoad({
+                date: date.toDateString(),
+                airportCode: code,
+                calculatedArrLoad: _.pluck(res.arr, 'load'),
+                calculatedDepLoad: _.pluck(res.dep, 'load'),
+                rawArrResponses: _.pluck(res.dep, 'req'),
+                rawDepResponses: _.pluck(res.arr, 'req')
+            }).save(function (err) {
+                cb(err, load);
             });
-        },
-        function (cb) {
-            queryFlightStats('arr', code, date, 18, function (err, data) {
-                if (err)
-                    console.log(err);
-                processArrivalFlights(data, cb);
-            });
+        }]
+    }, function (err, res) {
+        console.log(res.save);
+        cb(err, res.save);
+    });
+}
+
+
+function queryAndParseSchedule(code, date, direction, hour, cb) {
+    var url = 'https://api.flightstats.com/flex/schedules/rest/v1/json/';
+    if (direction === 'dep') {
+        url += 'from/' + code + '/departing/';
+    } else if (direction === 'arr') {
+        url += 'to/' + code + '/arriving/';
+    } else {
+        cb(new Error('Unknown direction ' + direction));
+    }
+    url += date.getFullYear() + "/" + (date.getMonth() + 1) + "/" + date.getDate() + '/' + hour;
+    url += '?appId=' + config.flightstats.appId + '&appKey=' + config.flightstats.appId;
+
+    async.waterfall([
+        async.apply(request.get, {url: url, json: true}),
+        async.apply(parseSchedule, direction)
+    ], cb);
+}
+
+function parseSchedule(direction, req, obj, cb) {
+    if (_.isNull(obj))
+        return cb(new Error('null response from server req: ' + req));
+
+    var load = {};
+
+    _.each(obj.scheduledFlights, function (scheduledFlight) {
+        if (scheduledFlight.isCodeshare)
+            return;
+        var terminal = 'NOTERM';
+        if (direction === 'dep') {
+            terminal = scheduledFlight.departureTerminal ? scheduledFlight.departureTerminal : terminal;
+        } else if (direction === 'arr') {
+            terminal = scheduledFlight.arrivalTerminal ? scheduledFlight.arrivalTerminal : terminal;
         }
-    ], function (err, results) {
-        if (err)
-            console.log(err);
-        var buckets = [results[0][0], results[1][0], results[2][0], results[3][0]];
-        var qs = [results[0][1], results[1][1], results[2][1], results[3][1]];
-        joinBuckets(qs, buckets, cb);
-    });
-}
 
-function queryAndProcessDepartures(code, date, cb) {
-    async.parallel([
-        function (cb) {
-            queryFlightStats('dep', code, date, 0, function (err, data) {
-                if (err)
-                    console.log(err);
-                processDepartureFlights(data, cb);
-            });
-        },
-        function (cb) {
-            queryFlightStats('dep', code, date, 6, function (err, data) {
-                if (err)
-                    console.log(err);
-                processDepartureFlights(data, cb);
-            });
-        },
-        function (cb) {
-            queryFlightStats('dep', code, date, 12, function (err, data) {
-                if (err)
-                    console.log(err);
-                processDepartureFlights(data, cb);
-            });
-        },
-        function (cb) {
-            queryFlightStats('dep', code, date, 18, function (err, data) {
-                if (err)
-                    console.log(err);
-                processDepartureFlights(data, cb);
-            });
-        }
-    ], function (err, results) {
-        if (err)
-            console.log(err);
-        var buckets = [results[0][0], results[1][0], results[2][0], results[3][0]];
-        var qs = [results[0][1], results[1][1], results[2][1], results[3][1]];
-        joinBuckets(qs, buckets, cb);
+        var cap = planesCap(scheduledFlight.flightEquipmentIataCode);
+        if (!_.has(load, terminal))
+            load[terminal] = 0;
+        load[terminal] += cap;
     });
-}
 
-function queryFlightStats(type, code, date, hour, cb) {
-    request.get("https://api.flightstats.com/flex/flightstatus/historical/rest/v2/json/airport/status/"
-        + code + "/" + type + "/" + date.getFullYear() + "/" + (date.getMonth() + 1) + "/" + date.getDate() + "/" + hour
-        + "?appId=" + config.flightstats.appId + "&appKey=" + config.flightstats.apiKey + "&utc=false&numHours=6&maxFlights=10000",
-        function (err, res, body) {
-            cb(err, body);
-        }
-    );
-}
-
-function processArrivalFlights(obj, cb) {
-    if (!_.isObject(obj))
-        obj = JSON.parse(obj);
-    var hourTerminalBuckets = [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}];
-    if (!obj || !_.has(obj, "flightStatuses"))
-        return cb(null, [hourTerminalBuckets, obj]);
-    async.each(obj.flightStatuses, function (item, cb) {
-        if (!_.has(item, "arrivalDate") || !_.has(item.arrivalDate, "dateLocal"))
-            return cb();
-        var hour = new Date(item.arrivalDate.dateLocal).getUTCHours();
-        var capacity = 0;
-        var terminal = "NOTERM";
-        if (_.has(item, "flightEquipment") && _.has(item.flightEquipment, "scheduledEquipmentIataCode"))
-            capacity = planesCap(item.flightEquipment.scheduledEquipmentIataCode);
-        if (_.has(item, "airportResources") && _.has(item.airportResources, "arrivalTerminal"))
-            terminal = item.airportResources.arrivalTerminal;
-        var h = hourTerminalBuckets[hour];
-        if (!_.has(h, terminal))
-            h[terminal] = 0;
-        h[terminal] += capacity;
-        return cb();
-    }, function (err) {
-        cb(err, [hourTerminalBuckets, obj]);
-    });
-}
-
-function processDepartureFlights(obj, cb) {
-    if (!_.isObject(obj))
-        obj = JSON.parse(obj);
-    var hourTerminalBuckets = [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}];
-    if (!obj || !_.has(obj, "flightStatuses"))
-        return cb(null, [hourTerminalBuckets, obj]);
-    async.each(obj.flightStatuses, function (item, cb) {
-        if (!_.has(item, "departureDate") || !_.has(item.departureDate, "dateLocal"))
-            return cb();
-        var hour = new Date(item.departureDate.dateLocal).getUTCHours();
-        var capacity = 0;
-        var terminal = "NOTERM";
-        if (_.has(item, "flightEquipment") && _.has(item.flightEquipment, "scheduledEquipmentIataCode"))
-            capacity = planesCap(item.flightEquipment.scheduledEquipmentIataCode);
-        if (_.has(item, "airportResources") && _.has(item.airportResources, "departureTerminal"))
-            terminal = item.airportResources.departureTerminal;
-        var h = hourTerminalBuckets[hour];
-        if (!_.has(h, terminal))
-            h[terminal] = 0;
-        h[terminal] += capacity;
-        return cb();
-    }, function (err) {
-        cb(err, [hourTerminalBuckets, obj]);
-    });
-}
-
-function joinBuckets(qs, buckets, cb) {
-    console.log("join buckets");
-    var hourTerminalBuckets = [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}];
-    if (!buckets)
-        cb(null, hourTerminalBuckets);
-    _.each(buckets, function (bucket) {
-        _.each(bucket, function (termsCap, hour) {
-            _.each(termsCap, function (capacity, terminal) {
-                var h = hourTerminalBuckets[hour];
-                if (!_.has(h, terminal))
-                    h[terminal] = 0;
-                h[terminal] += capacity;
-            });
-        });
-    });
-    cb(null, [hourTerminalBuckets, qs]);
+    cb(null, {load: load, req: null});
 }
