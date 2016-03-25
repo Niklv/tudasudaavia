@@ -60,8 +60,7 @@ exports.find = function (req, res) {
                 {desc: regex}
             ]
         }
-    ).
-    sort("desc").exec(function (err, airports) {
+    ).sort("desc").exec(function (err, airports) {
         if (err)
             res.json(500, err);
         else
@@ -87,17 +86,68 @@ exports.checkCache = function (req, res, next) {
 
 exports.load = function (req, res, next) {
     getSchedule(req.airportCode, req.queryDate, function (err, data) {
-        load.save(function (err) {
-            if (err)
-                res.json(500, err);
-            else
-                res.json({airport: req.airport, arr: data.calculatedArrLoad, dep: data.calculatedDepLoad});
-        });
+        if (err)
+            res.json(500, err);
+        else
+            res.json({airport: req.airport, arr: data.calculatedArrLoad, dep: data.calculatedDepLoad});
     });
 };
 
 function getSchedule(code, date, cb) {
-    // need mock it!
+    /* cb(null, {
+     date: date.toDateString(),
+     airportCode: code,
+     calculatedArrLoad: [{"A": 1000, "B": 300},
+     {"A": 1000, "B": 300},
+     {},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300},
+     {},
+     {"A": 1000, "B": 300},
+     {"B": 300},
+     {"A": 1000, "B": 300, "C": 200},
+     {"C": 200},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300, "C": 200},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300},
+     {"B": 300},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300, "C": 200},
+     {"A": 1000},
+     {"A": 1000},
+     {"A": 1000},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300}],
+     calculatedDepLoad: [{"A": 1000, "B": 300},
+     {"A": 1000, "B": 300},
+     {},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300},
+     {},
+     {"A": 1000, "B": 300},
+     {"B": 300},
+     {"A": 1000, "B": 300, "C": 200},
+     {"C": 200},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300, "C": 200},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300},
+     {"B": 300},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300, "C": 200},
+     {"A": 1000},
+     {"A": 1000},
+     {"A": 1000},
+     {"A": 1000, "B": 300},
+     {"A": 1000, "B": 300}],
+     rawArrResponses: null,
+     rawDepResponses: null
+     });*/
     async.auto({
         dep: function (cb) {
             async.times(24, async.apply(queryAndParseSchedule, code, date, 'dep'), cb);
@@ -113,7 +163,8 @@ function getSchedule(code, date, cb) {
                 calculatedDepLoad: _.pluck(res.dep, 'load'),
                 rawArrResponses: _.pluck(res.dep, 'req'),
                 rawDepResponses: _.pluck(res.arr, 'req')
-            }).save(function (err) {
+            });
+            load.save(function (err) {
                 cb(err, load);
             });
         }]
@@ -134,10 +185,10 @@ function queryAndParseSchedule(code, date, direction, hour, cb) {
         cb(new Error('Unknown direction ' + direction));
     }
     url += date.getFullYear() + "/" + (date.getMonth() + 1) + "/" + date.getDate() + '/' + hour;
-    url += '?appId=' + config.flightstats.appId + '&appKey=' + config.flightstats.appId;
+    url += '?appId=' + config.flightstats.appId + '&appKey=' + config.flightstats.apiKey;
 
     async.waterfall([
-        async.apply(request.get, {url: url, json: true}),
+        async.apply(request.get, url),
         async.apply(parseSchedule, direction)
     ], cb);
 }
@@ -145,7 +196,8 @@ function queryAndParseSchedule(code, date, direction, hour, cb) {
 function parseSchedule(direction, req, obj, cb) {
     if (_.isNull(obj))
         return cb(new Error('null response from server req: ' + req));
-
+    if(!_.isObject(obj))
+        obj = JSON.parse(obj);
     var load = {};
 
     _.each(obj.scheduledFlights, function (scheduledFlight) {
@@ -164,5 +216,5 @@ function parseSchedule(direction, req, obj, cb) {
         load[terminal] += cap;
     });
 
-    cb(null, {load: load, req: null});
+    cb(null, {load: load, req: req});
 }

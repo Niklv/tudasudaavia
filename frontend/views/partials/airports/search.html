@@ -1,8 +1,9 @@
-<div class="containter">
-    <div class="row">
+<div class="row">
+    <div class="col-sm-12 text-center">
         <form class="form-inline" ng-submit="findOne()">
             <div class="form-group">
                 <angucomplete-alt id="airports"
+                                  class="text-left"
                                   placeholder="Search airport"
                                   pause="400"
                                   selected-object="selectedAirport"
@@ -35,20 +36,29 @@
             <button type="submit" class="btn btn-default form-control">Load</button>
         </form>
     </div>
-    <div class="row" ng-show="result">
-        <div class="col-sm-6">
-            <h3>Departure</h3>
-            <canvas id="line1" class="chart chart-line" chart-data="dataDep"
-                    chart-labels="labels" chart-legend="true" chart-series="seriesDep">
-            </canvas>
-            <h3>Arrival</h3>
-            <canvas id="line2" class="chart chart-line" chart-data="dataArr"
-                    chart-labels="labels" chart-legend="true" chart-series="seriesArr">
+</div>
+<div class="row" ng-show="result">
+    <div class="col-sm-offset-1 col-sm-5">
+        <h3>Departures</h3>
+        <div ng-repeat="dep in deps track by $index">
+            <h4>Terminal "{{dep.terminal[0]}}"</h4>
+            <canvas id="line1" class="chart chart-line" chart-data="dep.load"
+                    chart-labels="labels" chart-legend="true" chart-series="dep.terminal" chart-options="gr_opts">
             </canvas>
         </div>
-        <div class="col-sm-6">
-            <h3>JSON</h3>
-            <pre>{{result | json}}</pre>
+    </div>
+    <div class="col-sm-5">
+        <h3>Arrivals</h3>
+        <div ng-repeat="arr in arrs track by $index">
+            <h4>Terminal "{{arr.terminal[0]}}"</h4>
+            <canvas id="line2" class="chart chart-line" chart-data="arr.load"
+                    chart-labels="labels" chart-legend="true" chart-series="arr.terminal" chart-options="gr_opts">
+            </canvas>
         </div>
+
+    </div>
+    <div class="col-sm-12">
+        <h4>JSON</h4>
+        <pre class="small">{{result | json}}</pre>
     </div>
 </div>
