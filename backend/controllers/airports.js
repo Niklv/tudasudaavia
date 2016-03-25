@@ -169,7 +169,6 @@ function getSchedule(code, date, cb) {
             });
         }]
     }, function (err, res) {
-        console.log(res.save);
         cb(err, res.save);
     });
 }
@@ -216,5 +215,5 @@ function parseSchedule(direction, req, obj, cb) {
         load[terminal] += cap;
     });
 
-    cb(null, {load: load, req: req});
+    cb(null, {load: load, req: obj});
 }
